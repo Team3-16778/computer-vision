@@ -1,3 +1,35 @@
+"""
+==========================================
+Fisheye Camera Calibration & Cartesian Mapping
+==========================================
+Device: Arducam MIPI CSI (Jetson Orion Nano)
+Goal: Calibrate fisheye camera using a checkerboard and map the image to Cartesian coordinates.
+
+Pseudocode Outline:
+1. **Initialize Camera**:
+   - Open Arducam MIPI CSI using OpenCV.
+
+2. **Collect Calibration Images**:
+   - Detect a checkerboard pattern in multiple images.
+   - Store the detected corner points.
+
+3. **Calibrate the Camera**:
+   - Compute intrinsic matrix (K) and distortion coefficients (D) from collected images.
+
+4. **Undistort the Fisheye Image**:
+   - Use `cv2.fisheye.undistortImage()` to remove fisheye distortion.
+
+5. **Convert to Cartesian Coordinates**:
+   - Map fisheye pixels to Cartesian coordinates using a radial transformation.
+
+6. **Live Processing**:
+   - Continuously capture and undistort frames.
+   - Display the undistorted image and apply Cartesian mapping.
+
+Press 'q' to exit.
+"""
+
+
 import cv2
 import numpy as np
 import glob
