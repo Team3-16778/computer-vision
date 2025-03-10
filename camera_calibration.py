@@ -64,7 +64,7 @@ h, w = gray.shape[:2]
 print(f"\nDetected Image Size: {w}x{h}")
 
 # Run camera calibration using objpoints & imgpoints arrays
-ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, (w, h), None, None)
+ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, (w, h), None, None, flags=cv2.CALIB_FIX_K3)
 
 # Print results
 print("\nCamera Calibration Results:")
