@@ -108,8 +108,37 @@ for fname in images:
 cv2.destroyAllWindows()
 
 
-"""
-Reprojection For future Data 
-"""
+# """
+# Compute homography as test
+# """
+# calib_data = np.load("camera_calibration_data.npz")
+# camera_matrix = calib_data["camera_matrix"]
+# dist_coeffs = calib_data["dist_coeffs"]
+# rvecs = calib_data["rvecs"]
+# tvecs = calib_data["tvecs"]
 
-NotImplementedError("Reprojection for future data not implemented yet")
+# # Define the output resolution for rectified images
+# output_size = (800, 600)  # Adjust as needed
+
+# for i, fname in enumerate(glob.glob("checkerboard_images/*.jpg")):
+#     img = cv2.imread(fname)
+
+#     # Compute rotation and translation matrices
+#     R, _ = cv2.Rodrigues(rvecs[i])  # Convert rvecs to a 3x3 rotation matrix
+#     T = tvecs[i].reshape(3, 1)  # Convert tvec to a column vector
+
+#     # Compute a valid homography matrix (3x3)
+#     H = camera_matrix @ (R - (T @ np.array([[0, 0, 1]])))
+#     H = H / H[2, 2]  # Normalize
+
+#     # Convert to float32 for OpenCV
+#     H = H.astype(np.float32)
+
+#     # Warp the image to make the checkerboard appear frontal
+#     warped = cv2.warpPerspective(img, H, output_size)  # Use the defined output size
+
+#     # Show the rectified image
+#     cv2.imshow("Rectified Checkerboard", warped)
+#     cv2.waitKey(1000)
+
+# cv2.destroyAllWindows()
