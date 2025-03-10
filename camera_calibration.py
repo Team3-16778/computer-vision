@@ -93,7 +93,7 @@ for fname in images:
     img = cv2.imread(fname)
     
     # Get the optimal new camera matrix (better field of view)
-    new_camera_mtx, roi = cv2.getOptimalNewCameraMatrix(mtx, dist, (w, h), 1, (w, h))
+    new_camera_mtx, roi = cv2.getOptimalNewCameraMatrix(mtx, dist, (w, h), 0, (w, h))
 
     # Undistort the image
     undistorted = cv2.undistort(img, mtx, dist, None, new_camera_mtx)
