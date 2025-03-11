@@ -1,144 +1,81 @@
-"""
-Camera calibration implementation using OpenCV
-Mechatronic Design, Michael (Chase) Allen
-
-This script is based on the following OpenCV tutorial:
-https://docs.opencv.org/4.x/dc/dbb/tutorial_py_calibration.html
-"""
-
-
-
 import cv2
 import numpy as np
 import glob
 import warnings
+import matplotlib.pyplot as plt
 
-"""
-Find checkerboard
-"""
-
-# Define checkerboard size
-CHECKERBOARD = (9, 6)  # Adjust based on your checkerboard
-square_size = 1.0  # Set appropriately if needed
-
-# Prepare object points (0,0,0), (1,0,0), ..., (8,5,0) assuming z=0 (planar)
-objp = np.zeros((CHECKERBOARD[0] * CHECKERBOARD[1], 3), np.float32)
-objp[:, :2] = np.mgrid[0:CHECKERBOARD[0], 0:CHECKERBOARD[1]].T.reshape(-1, 2)
-objp *= square_size  # Scale if square size is known
-
-# Storage for object points & image points
-objpoints = []  # 3D points in real-world space
-imgpoints = []  # 2D points in image plane
-
-# Load images
-images = glob.glob("checkerboard_images/*.jpg")
-
-for fname in images:
-    print(f"Processing {fname}")
-    img = cv2.imread(fname)
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+def find_checkerboard_corners(images, checkerboard):
+    objp = np.zeros((checkerboard[0] * checkerboard[1], 3), np.float32)
+    objp[:, :2] = np.mgrid[0:checkerboard[0], 0:checkerboard[1]].T.reshape(-1, 2)
+    objpoints, imgpoints = [], []
     
-    # Find the checkerboard corners
-    ret, corners = cv2.findChessboardCorners(gray, CHECKERBOARD, None)
-    
-    if ret:
-        objpoints.append(objp)
-        imgpoints.append(corners)
+    for fname in images:
+        img = cv2.imread(fname)
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        ret, corners = cv2.findChessboardCorners(gray, checkerboard, None)
         
-        # Draw and show corners
-        cv2.drawChessboardCorners(img, CHECKERBOARD, corners, ret)
-        cv2.imshow('Checkerboard', img)
-        cv2.waitKey(1000)
-    else:
-        warnings.warn(f"Could not detect corners in {fname}", UserWarning)
-
-cv2.destroyAllWindows()
-
-
-"""    
-Perform Camera Calibration
-"""
-
-# Get image size (all were taken with same camera)
-h, w = gray.shape[:2]
-print(f"\nDetected Image Size: {w}x{h}")
-
-# Run camera calibration using objpoints & imgpoints arrays
-ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, (w, h), None, None, flags=cv2.CALIB_FIX_K3)
-
-# Print results
-print("\nCamera Calibration Results:")
-print("Camera Matrix:\n", mtx)  # Intrinsic parameters
-print("Distortion Coefficients:\n", dist)  # Lens distortion
-print("Rotation Vectors:\n", rvecs)  # Extrinsic rotation for each image
-print("Translation Vectors:\n", tvecs)  # Extrinsic translation for each image
-
-# Save calibration parameters
-np.savez("camera_calibration_data.npz", camera_matrix=mtx, dist_coeffs=dist, rvecs=rvecs, tvecs=tvecs)
-
-# Reprojection error (to check accuracy)
-mean_error = 0
-for i in range(len(objpoints)):
-    imgpoints2, _ = cv2.projectPoints(objpoints[i], rvecs[i], tvecs[i], mtx, dist)
-    error = cv2.norm(imgpoints[i], imgpoints2, cv2.NORM_L2) / len(imgpoints2)
-    mean_error += error
-
-print(f"\nMean Reprojection Error: {mean_error / len(objpoints)}")
-
-
-"""
-Undistort Images"
-"""
-for fname in images:
-    img = cv2.imread(fname)
+        if ret:
+            objpoints.append(objp)
+            imgpoints.append(corners)
+            cv2.drawChessboardCorners(img, checkerboard, corners, ret)
+        else:
+            warnings.warn(f"Could not detect corners in {fname}", UserWarning)
     
-    # Get the optimal new camera matrix (better field of view)
-    new_camera_mtx, roi = cv2.getOptimalNewCameraMatrix(mtx, dist, (w, h), 0, (w, h))
+    return objpoints, imgpoints, gray.shape[:2]
 
-    # Undistort the image
-    undistorted = cv2.undistort(img, mtx, dist, None, new_camera_mtx)
+def calibrate_camera(objpoints, imgpoints, image_size):
+    ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, image_size, None, None, flags=cv2.CALIB_FIX_K3)
+    np.savez("camera_calibration_data.npz", camera_matrix=mtx, dist_coeffs=dist, rvecs=rvecs, tvecs=tvecs)
+    return mtx, dist
 
-    # Crop and display (optional)
-    # x, y, w, h = roi
-    # undistorted = undistorted[y:y+h, x:x+w]
+def undistort_images(images, mtx, dist, image_size):
+    undistorted_images = []
+    new_camera_mtx, _ = cv2.getOptimalNewCameraMatrix(mtx, dist, image_size, 1, image_size)
     
-    cv2.imshow("Undistorted", undistorted)
-    cv2.waitKey(1000)
+    for fname in images:
+        img = cv2.imread(fname)
+        undistorted = cv2.undistort(img, mtx, dist, None, new_camera_mtx)
+        undistorted_images.append(undistorted)
+    
+    return undistorted_images
 
-cv2.destroyAllWindows()
+def show_results(original, corners_img, undistorted):
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+    axes[0].imshow(cv2.cvtColor(original, cv2.COLOR_BGR2RGB))
+    axes[0].set_title("Original Image")
+    axes[0].axis("off")
+    
+    axes[1].imshow(cv2.cvtColor(corners_img, cv2.COLOR_BGR2RGB))
+    axes[1].set_title("Corners Detected")
+    axes[1].axis("off")
+    
+    axes[2].imshow(cv2.cvtColor(undistorted, cv2.COLOR_BGR2RGB))
+    axes[2].set_title("Undistorted Image")
+    axes[2].axis("off")
+    
+    plt.show()
 
+def main():
+    CHECKERBOARD = (9, 6)
+    images = glob.glob("checkerboard_images/*.jpg")
+    
+    if not images:
+        print("No images found!")
+        return
+    
+    objpoints, imgpoints, image_size = find_checkerboard_corners(images, CHECKERBOARD)
+    mtx, dist = calibrate_camera(objpoints, imgpoints, image_size)
+    undistorted_images = undistort_images(images, mtx, dist, image_size)
+    
+    original_img = cv2.imread(images[0])
+    corners_img = original_img.copy()
+    gray = cv2.cvtColor(original_img, cv2.COLOR_BGR2GRAY)
+    ret, corners = cv2.findChessboardCorners(gray, CHECKERBOARD, None)
+    if ret:
+        cv2.drawChessboardCorners(corners_img, CHECKERBOARD, corners, ret)
+    undistorted_img = undistorted_images[0]
+    
+    show_results(original_img, corners_img, undistorted_img)
 
-# """
-# Compute homography as test
-# """
-# calib_data = np.load("camera_calibration_data.npz")
-# camera_matrix = calib_data["camera_matrix"]
-# dist_coeffs = calib_data["dist_coeffs"]
-# rvecs = calib_data["rvecs"]
-# tvecs = calib_data["tvecs"]
-
-# # Define the output resolution for rectified images
-# output_size = (800, 600)  # Adjust as needed
-
-# for i, fname in enumerate(glob.glob("checkerboard_images/*.jpg")):
-#     img = cv2.imread(fname)
-
-#     # Compute rotation and translation matrices
-#     R, _ = cv2.Rodrigues(rvecs[i])  # Convert rvecs to a 3x3 rotation matrix
-#     T = tvecs[i].reshape(3, 1)  # Convert tvec to a column vector
-
-#     # Compute a valid homography matrix (3x3)
-#     H = camera_matrix @ (R - (T @ np.array([[0, 0, 1]])))
-#     H = H / H[2, 2]  # Normalize
-
-#     # Convert to float32 for OpenCV
-#     H = H.astype(np.float32)
-
-#     # Warp the image to make the checkerboard appear frontal
-#     warped = cv2.warpPerspective(img, H, output_size)  # Use the defined output size
-
-#     # Show the rectified image
-#     cv2.imshow("Rectified Checkerboard", warped)
-#     cv2.waitKey(1000)
-
-# cv2.destroyAllWindows()
+if __name__ == "__main__":
+    main()
