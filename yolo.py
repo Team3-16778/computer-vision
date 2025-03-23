@@ -15,6 +15,7 @@ import cv2
 import threading
 import numpy as np
 from ultralytics import YOLO
+import torch
 
 
 
@@ -128,7 +129,16 @@ def gstreamer_pipeline(
 
 def run_cameras():
     window_title = "Dual CSI Cameras with YOLOv8"
-    model = YOLO('yolov8n.pt')
+    # model = YOLO('yolov8n.pt').export(format='engine', device='cuda:0')
+    
+    # model = YOLO('yolov8n.pt').export(format='onnx')
+    model = YOLO('yolov8n.onnx')
+    
+    # device = torch.device("cuda")
+    # model = YOLO('yolov8n.pt').export(format='engine', device=device)
+
+    # model = YOLO('yolov8n.pt')
+
     class_names = model.names
 
     # Initialize cameras
