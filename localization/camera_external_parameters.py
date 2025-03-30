@@ -43,10 +43,10 @@ def cal_cam_pose_lsq(camera_poses):
 # 1. get camera internal parameters from exist file'
 camera_calibration_file = dir_path + "/camera1_calibration_data.npz"
 data = np.load(camera_calibration_file)
-print(data)
 camera_matrix = data["camera_matrix"]
 dist_coeffs = data["dist_coeffs"]
-
+print("Camera Matrix: \n", camera_matrix)
+print("Distortion Coefficients: \n", dist_coeffs)
 
 # 2. Define the ArUco dictionary
 aruco_dict = aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
