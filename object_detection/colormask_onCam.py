@@ -11,10 +11,12 @@
 # The camera streams are each read in their own thread, as when done sequentially there
 # is a noticeable lag
 
+import os
 import cv2
 import threading
 import numpy as np
 
+dir_path = os.path.dirname(os.path.realpath(__file__))
 
 class CSI_Camera:
 
@@ -29,6 +31,12 @@ class CSI_Camera:
         self.read_thread = None
         self.read_lock = threading.Lock()
         self.running = False
+        # Internal Parameters
+        self.camera_matrix = None
+        self.dist_coeffs = None
+        # External Parameters
+        self.Rotation_matrix = None
+        self.Translation_vector = None
 
     def open(self, gstreamer_pipeline_string):
         try:
@@ -88,6 +96,19 @@ class CSI_Camera:
         if self.read_thread != None:
             self.read_thread.join()
 
+    def get_internal_parameters(self, file_name):
+    	camera_internal_file = dir_path + "/" + file_name
+    	internal_data = np.load(camera_internal_file)
+    	self.camera_matrix = internal_data["camera_matrix"]
+    	self.dist_coeffs = internal_data["dist_coeffs"]
+    	print("Camera Matrix: \n", self.camera_matrix)
+    	print("Distortion Coefficients: \n", self.dist_coeffs)
+
+    def get_external_parameters(self, file_name):
+      	camera_external_file = dir_path + "/" + file_name
+      	T_world_camera = np.load(camera_external_file)["T_world_camera"]
+      	self.Rotation_matrix = T_world_camera[0:3, 0:3]
+      	self.Translation_vector = T_world_camera[0:3, 3].reshape(3, 1)
 
 """ 
 gstreamer_pipeline returns a GStreamer pipeline for capturing from the CSI camera
@@ -138,6 +159,10 @@ def run_cameras():
             display_height=540,
         )
     )
+    int_params_file = "camera1_calibration_data.npz"
+    left_camera.get_internal_parameters(int_params_file)
+    ext_params_file = "camera_external_parameters.npz"
+    left_camera.get_external_parameters(ext_params_file)
     left_camera.start()
 
     right_camera = CSI_Camera()
@@ -160,7 +185,7 @@ def run_cameras():
         try:
             while True:
                 _, left_image = left_camera.read()
-                left_image, left_image_mask, left_image_mask_bgr = colormask(left_image)
+                left_image, left_image_mask, left_image_mask_bgr = colormask(left_image, left_camera)
                 _, right_image = right_camera.read()
                 # Use numpy to place images next to each other
                 camera_images = np.hstack((left_image, left_image_mask_bgr)) 
@@ -191,8 +216,40 @@ def run_cameras():
         right_camera.stop()
         right_camera.release()
 
+def calculate_world_3D(camera, u, v, Zc = 0.5): # Zc is the distance from the camera to the target(default is a random value)
+    """
+    Calculate the 3D coordinates of the target in the world frame
+    Input:
+        u: x coordinate of the target in the image
+        v: y coordinate of the target in the image
+        Zc: depth of the target in the camera frame (distance from the camera to the target)
+    Output:
+        world_point: 3D coordinates of the target in the world frame
+    """
+    # Get the parameters we need: focal length, principal point, and rotation vector and translation vector
+    fx = camera.camera_matrix[0, 0]
+    fy = camera.camera_matrix[1, 1]
+    cx = camera.camera_matrix[0, 2]
+    cy = camera.camera_matrix[1, 2]
+    Rotation_matrix = camera.Rotation_matrix
+    Translation_vector = camera.Translation_vector
 
-def colormask(image):
+    # 4. Compute the 3D coordinates of the target in the camera frame
+    Xc = (u - cx) * Zc / fx
+    Yc = (v - cy) * Zc / fy
+    camera_point = np.array([[Xc], [Yc], [Zc]])
+
+    # 5. Compute the 3D coordinates of the target in the world frame
+    # Method 1: external parameters is T_world_camera
+    world_point = Rotation_matrix @ camera_point + Translation_vector
+
+    # Method 2: external parameters is T_camera_world
+    # world_point = Rotation_matrix.T @ (camera_point - Translation_vector)
+
+    return world_point
+
+
+def colormask(image, camera):
     # Preprocessing: blur to reduce noise
     blurred = cv2.GaussianBlur(image, (11, 11), 0)
 
@@ -234,6 +291,8 @@ def colormask(image):
             cv2.drawMarker(mask_bgr, (cx, cy), (255, 0, 0), markerType=cv2.MARKER_CROSS, markerSize=20, thickness=2)
 
             print(f"Detected object center: ({cx}, {cy})")
+            target_world_3D = calculate_world_3D(camera, cx, cy)
+            print(f"The World Coordinate of detected object center: \n X: {target_world_3D[0]} Y: {target_world_3D[1]} Z: {target_world_3D[2]}")
 
     return image_rgb, masked_image, mask_bgr
 
