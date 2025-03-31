@@ -68,7 +68,7 @@ def mouse_callback(event, u, v, flags, param):
 
 cap = cv2.VideoCapture(0)  # Open the default camera
 cv2.namedWindow("Camera")
-cv2.setMouseCallback("Camera", mouse_callback, None)
+cv2.setMouseCallback("Camera", mouse_callback)
 
 while True:
     ret, frame = cap.read()
