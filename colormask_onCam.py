@@ -191,39 +191,46 @@ def run_cameras():
         right_camera.stop()
         right_camera.release()
 
-
+        
 def colormask(image):
+    # Preprocessing: blur to reduce noise
+    blurred = cv2.GaussianBlur(image, (11, 11), 0)
 
-    # Convert BGR to RGB for proper display
-    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  
+    # Convert to HSV
+    hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
 
-    # Convert to HSV color space
-    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    # Define two HSV red ranges (wraps around hue=0)
+    lower_red1 = np.array([0, 100, 100])
+    upper_red1 = np.array([10, 255, 255])
+    lower_red2 = np.array([160, 100, 100])
+    upper_red2 = np.array([179, 255, 255])
 
-    # Define color range for masking (adjust as needed)
-    lower_bound = np.array([120, 30, 30])  # Relaxed: Purple lower bound
-    upper_bound = np.array([180, 255, 255])  # Relaxed: Purple upper bound
+    # Create two masks and combine
+    mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
+    mask2 = cv2.inRange(hsv, lower_red2, upper_red2)
+    mask = cv2.bitwise_or(mask1, mask2)
 
-    # Create the mask (black and white)
-    mask = cv2.inRange(hsv, lower_bound, upper_bound)
+    # Morphological ops to reduce noise and fill gaps
+    kernel = np.ones((5, 5), np.uint8)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
 
     # Compute average coordinates of the masked area
-    coordinates = np.column_stack(np.where(mask > 0))  # Get all nonzero pixel locations
+    coordinates = np.column_stack(np.where(mask > 0))
     if len(coordinates) > 0:
-        avg_y, avg_x = np.mean(coordinates, axis=0).astype(int)  # Compute average coordinates
+        avg_y, avg_x = np.mean(coordinates, axis=0).astype(int)
         print(f"Average object location: ({avg_x}, {avg_y})")
     else:
-        avg_x, avg_y = -1, -1  # Default if nothing is detected
+        avg_x, avg_y = -1, -1
 
-    # Apply the mask to the original image
+    # Apply mask
+    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     masked_image = cv2.bitwise_and(image_rgb, image_rgb, mask=mask)
-
-    # Convert mask to 3-channel for visualization
     mask_bgr = cv2.cvtColor(mask, cv2.COLOR_GRAY2RGB)
 
-    # Draw a red marker at the average location
+    # Draw marker
     if avg_x >= 0 and avg_y >= 0:
-        cv2.drawMarker(mask_bgr, (avg_x, avg_y), (0, 255, 0), markerType=cv2.MARKER_CROSS, markerSize=20, thickness=2)
+        cv2.drawMarker(mask_bgr, (avg_x, avg_y), (0, 255, 0), cv2.MARKER_CROSS, 20, 2)
 
     return image_rgb, masked_image, mask_bgr
 
