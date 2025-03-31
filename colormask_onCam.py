@@ -191,7 +191,7 @@ def run_cameras():
         right_camera.stop()
         right_camera.release()
 
-        
+
 def colormask(image):
     # Preprocessing: blur to reduce noise
     blurred = cv2.GaussianBlur(image, (11, 11), 0)
@@ -199,38 +199,41 @@ def colormask(image):
     # Convert to HSV
     hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
 
-    # Define two HSV red ranges (wraps around hue=0)
+    # Red hue range (wraps around 0)
     lower_red1 = np.array([0, 100, 100])
     upper_red1 = np.array([10, 255, 255])
     lower_red2 = np.array([160, 100, 100])
     upper_red2 = np.array([179, 255, 255])
 
-    # Create two masks and combine
+    # Create binary masks
     mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
     mask2 = cv2.inRange(hsv, lower_red2, upper_red2)
     mask = cv2.bitwise_or(mask1, mask2)
 
-    # Morphological ops to reduce noise and fill gaps
+    # Morphological cleaning
     kernel = np.ones((5, 5), np.uint8)
     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
     mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
 
-    # Compute average coordinates of the masked area
-    coordinates = np.column_stack(np.where(mask > 0))
-    if len(coordinates) > 0:
-        avg_y, avg_x = np.mean(coordinates, axis=0).astype(int)
-        print(f"Average object location: ({avg_x}, {avg_y})")
-    else:
-        avg_x, avg_y = -1, -1
+    # Find contours
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-    # Apply mask
     image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     masked_image = cv2.bitwise_and(image_rgb, image_rgb, mask=mask)
     mask_bgr = cv2.cvtColor(mask, cv2.COLOR_GRAY2RGB)
 
-    # Draw marker
-    if avg_x >= 0 and avg_y >= 0:
-        cv2.drawMarker(mask_bgr, (avg_x, avg_y), (0, 255, 0), cv2.MARKER_CROSS, 20, 2)
+    if contours:
+        # Find largest contour by area
+        largest_contour = max(contours, key=cv2.contourArea)
+        if cv2.contourArea(largest_contour) > 100:  # Ignore small blobs
+            x, y, w, h = cv2.boundingRect(largest_contour)
+            cx, cy = x + w // 2, y + h // 2
+
+            # Draw bounding box and center
+            cv2.rectangle(mask_bgr, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            cv2.drawMarker(mask_bgr, (cx, cy), (255, 0, 0), markerType=cv2.MARKER_CROSS, markerSize=20, thickness=2)
+
+            print(f"Detected object center: ({cx}, {cy})")
 
     return image_rgb, masked_image, mask_bgr
 
