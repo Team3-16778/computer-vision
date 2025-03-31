@@ -163,7 +163,7 @@ def run_cameras():
                 left_image, left_image_mask, left_image_mask_bgr = colormask(left_image)
                 _, right_image = right_camera.read()
                 # Use numpy to place images next to each other
-                camera_images = np.hstack((left_image, left_image_mask)) 
+                camera_images = np.hstack((left_image, left_image_mask_bgr)) 
                 # Check to see if the user closed the window
                 # Under GTK+ (Jetson Default), WND_PROP_VISIBLE does not work correctly. Under Qt it does
                 # GTK - Substitute WND_PROP_AUTOSIZE to detect if window has been closed by user
