@@ -1,9 +1,21 @@
 import os
 import cv2
+import cv2.aruco as aruco
+import numpy as np
 
-# Open the default camera, use id=0 for the default one
-cam_id = 0
-cap = cv2.VideoCapture(cam_id)
+dir_path = os.path.dirname(os.path.realpath(__file__))
+
+# Open camera
+# cap = cv2.VideoCapture(0) # for WebCam
+CSI_camera_params = 'nvarguscamerasrc ! video/x-raw(memory:NVMM), width=3280, height=2464, format=(string)NV12, framerate=(fraction)21/1 ! nvvidconv ! video/x-raw, format=(string)BGRx ! videoconvert ! video/x-raw, format=(string)BGR ! appsink'
+cap = cv2.VideoCapture(CSI_camera_params, cv2.CAP_GSTREAMER)
+
+# Get camera internal and external parameters from exist file
+camera_internal_file = dir_path + "/camera2_calibration_data.npz"
+internal_data = np.load(camera_internal_file)
+camera_matrix = internal_data["camera_matrix"]
+dist_coeffs = internal_data["dist_coeffs"]
+
 # Check if camera opened successfully
 if not cap.isOpened():
     print("Could not open video device")
@@ -18,8 +30,8 @@ if not os.path.exists(test_dir):
 
 
 # Define the ArUco dictionary
-aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
-parameters = cv2.aruco.DetectorParameters()
+aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
+parameters = aruco.DetectorParameters()
 
 
 img_num = 0
@@ -30,11 +42,24 @@ while True:
     if not ret:
         print("Can't receive frame. Exiting ...")
         break
+    #frame_re = cv2.resize(frame,(800, 600))
+    frame_re = frame
 
     # Detect the markers in the frame
-    corners, ids, rejected = cv2.aruco.detectMarkers(frame, aruco_dict, parameters=parameters)
+    corners, ids, rejected = aruco.detectMarkers(frame_re, aruco_dict, parameters=parameters)
+
+    if ids is not None:
+        # Estimate pose of detected markers
+        rvecs, tvecs, _ = aruco.estimatePoseSingleMarkers(corners, 0.023, camera_matrix, dist_coeffs) # 0.1 is the side length of the marker in meters
+
+        # Draw frame axes for each marker
+        for i in range(len(ids)):
+            cv2.drawFrameAxes(frame_re, camera_matrix, dist_coeffs, rvecs[i], tvecs[i], 0.05) # 0.05 is the length of the axes in meters
+
+    # Draw detected markers
+    aruco.drawDetectedMarkers(frame_re, corners, ids)
     # Draw the markers on the frame
-    frame_with_markers = cv2.aruco.drawDetectedMarkers(frame, corners, ids)
+    frame_with_markers = aruco.drawDetectedMarkers(frame_re, corners, ids)
 
     # Display the frame with the markers
     cv2.imshow("Camera", frame_with_markers)

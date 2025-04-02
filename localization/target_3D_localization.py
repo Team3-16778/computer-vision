@@ -5,14 +5,14 @@ import numpy as np
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
 # 1. Get camera internal and external parameters from exist file
-camera_internal_file = dir_path + "/camera1_calibration_data.npz"
+camera_internal_file = dir_path + "/camera2_calibration_data.npz"
 internal_data = np.load(camera_internal_file)
 camera_matrix = internal_data["camera_matrix"]
 dist_coeffs = internal_data["dist_coeffs"]
 print("Camera Matrix: \n", camera_matrix)
 print("Distortion Coefficients: \n", dist_coeffs)
 
-camera_external_file = dir_path + "/camera_external_parameters.npz"
+camera_external_file = dir_path + "/cam2_external_parameters_2.npz"
 T_world_camera = np.load(camera_external_file)["T_world_camera"]
 print("T_world_camera:\n", T_world_camera)
 
@@ -65,8 +65,11 @@ def mouse_callback(event, u, v, flags, param):
         # Store the point and label in the list
         points_with_labels.append((u, v, label))
 
+# Camera Stream
+# cap = cv2.VideoCapture(0)  # Open the default camera
+CSI_camera_params = 'nvarguscamerasrc ! video/x-raw(memory:NVMM), width=3280, height=2464, format=(string)NV12, framerate=(fraction)21/1 ! nvvidconv ! video/x-raw, format=(string)BGRx ! videoconvert ! video/x-raw, format=(string)BGR ! appsink'
+cap = cv2.VideoCapture(CSI_camera_params, cv2.CAP_GSTREAMER)
 
-cap = cv2.VideoCapture(0)  # Open the default camera
 cv2.namedWindow("Camera")
 cv2.setMouseCallback("Camera", mouse_callback)
 
@@ -75,18 +78,21 @@ while True:
     if not ret:
         break
 
+    # frame_re = cv2.resize(frame,(1920, 1080)) # resize the frame image
+    frame_re = frame
+ 
     # Undistort the frame if needed
     # frame = cv2.undistort(frame, camera_matrix, dist_coeffs)
     
     # Draw all the points with a circle and a label on the image
     for (x, y, label) in points_with_labels:
         # Print a circle
-        cv2.circle(frame, (x, y), 5, (0, 255, 0), -1)
+        cv2.circle(frame_re, (x, y), 5, (0, 255, 0), -1)
         # Add a label
-        cv2.putText(frame, label, (x + 10, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 
+        cv2.putText(frame_re, label, (x + 10, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 
                     0.5, (0, 255, 0), 2)
     
-    cv2.imshow("Camera", frame)
+    cv2.imshow("Camera", frame_re)
     key = cv2.waitKey(1)
     if key == 27:  # Esc key to exit
         break

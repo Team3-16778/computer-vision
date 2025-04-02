@@ -41,7 +41,7 @@ def cal_cam_pose_lsq(camera_poses):
     return T_avg
 
 # 1. get camera internal parameters from exist file'
-camera_calibration_file = dir_path + "/camera1_calibration_data.npz"
+camera_calibration_file = dir_path + "/camera2_calibration_data.npz"
 data = np.load(camera_calibration_file)
 camera_matrix = data["camera_matrix"]
 dist_coeffs = data["dist_coeffs"]
@@ -57,18 +57,18 @@ parameters = aruco.DetectorParameters()
 # Assuming we are using markers with IDs 1 and 2
 # Define the world transformation matrix (4x4) for each marker
 marker_world_poses = {
-    1: np.array([[1, 0, 0, 0.5],    # marker 1 is located at (0.5, 0, 0) meters
+    0: np.array([[1, 0, 0, 0.0],    # marker 0 is located at (0, 0, 0) meters
                  [0, 1, 0, 0.0],
                  [0, 0, 1, 0.0],
                  [0, 0, 0, 1]]),
-    2: np.array([[1, 0, 0, -0.5],   # marker 2 is located at (-0.5, 0, 0) meters
+    1: np.array([[1, 0, 0, 0.5],   # marker 1 is located at (0.5, 0, 0) meters
                  [0, 1, 0, 0.0],
                  [0, 0, 1, 0.0],
                  [0, 0, 0, 1]])
 }
 
 # 4. Read the image and detect ArUco markers
-img_file = dir_path + "/test_camera_0.png"
+img_file = dir_path + "/cam2_test_img_new_1.png" #img size (3280x2464)
 img = cv2.imread(img_file)  # change the path to your image
 gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 corners, ids, _ = aruco.detectMarkers(img, aruco_dict, parameters=parameters)
@@ -84,6 +84,7 @@ img_with_markers = aruco.drawDetectedMarkers(img, corners, ids)
 # 5. Estimate the poses of the markers, and compute the world transformation matrix of camera for each marker
 marker_length = 0.023  # length of each ArUco marker in meters
 camera_poses = []
+
 
 for i, marker_id in enumerate(ids.flatten()):
     # Estimate the pose of the marker(Rotation vector and Translation vector)
@@ -125,6 +126,6 @@ else:
 
 
 # 7. Save the camera pose to a file
-save_file = dir_path + "/camera_external_parameters.npz"
+save_file = dir_path + "/cam2_external_parameters_2.npz"
 np.savez(save_file, T_world_camera=T_avg)
 

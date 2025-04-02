@@ -97,18 +97,18 @@ class CSI_Camera:
             self.read_thread.join()
 
     def get_internal_parameters(self, file_name):
-    	camera_internal_file = dir_path + "/" + file_name
-    	internal_data = np.load(camera_internal_file)
-    	self.camera_matrix = internal_data["camera_matrix"]
-    	self.dist_coeffs = internal_data["dist_coeffs"]
-    	print("Camera Matrix: \n", self.camera_matrix)
-    	print("Distortion Coefficients: \n", self.dist_coeffs)
+        camera_internal_file = dir_path + "/" + file_name
+        internal_data = np.load(camera_internal_file)
+        self.camera_matrix = internal_data["camera_matrix"]
+        self.dist_coeffs = internal_data["dist_coeffs"]
+        print("Camera Matrix: \n", self.camera_matrix)
+        print("Distortion Coefficients: \n", self.dist_coeffs)
 
     def get_external_parameters(self, file_name):
-      	camera_external_file = dir_path + "/" + file_name
-      	T_world_camera = np.load(camera_external_file)["T_world_camera"]
-      	self.Rotation_matrix = T_world_camera[0:3, 0:3]
-      	self.Translation_vector = T_world_camera[0:3, 3].reshape(3, 1)
+        camera_external_file = dir_path + "/" + file_name
+        T_world_camera = np.load(camera_external_file)["T_world_camera"]
+        self.Rotation_matrix = T_world_camera[0:3, 0:3]
+        self.Translation_vector = T_world_camera[0:3, 3].reshape(3, 1)
 
 """ 
 gstreamer_pipeline returns a GStreamer pipeline for capturing from the CSI camera
@@ -120,8 +120,8 @@ Default 1920x1080
 
 def gstreamer_pipeline(
     sensor_id=0,
-    capture_width=1920,
-    capture_height=1080,
+    capture_width=3280,
+    capture_height=2464,
     display_width=1920,
     display_height=1080,
     framerate=30,
@@ -151,29 +151,31 @@ def run_cameras():
     left_camera = CSI_Camera()
     left_camera.open(
         gstreamer_pipeline(
-            sensor_id=0,
-            capture_width=1920,
-            capture_height=1080,
+            sensor_id=1,
+            capture_width=3280,
+            capture_height=2464,
             flip_method=0,
             display_width=960,
             display_height=540,
+            framerate=21,
         )
     )
-    int_params_file = "camera1_calibration_data.npz"
+    int_params_file = "camera2_calibration_data.npz"
     left_camera.get_internal_parameters(int_params_file)
-    ext_params_file = "camera_external_parameters.npz"
+    ext_params_file = "cam2_external_parameters_2.npz"
     left_camera.get_external_parameters(ext_params_file)
     left_camera.start()
 
     right_camera = CSI_Camera()
     right_camera.open(
         gstreamer_pipeline(
-            sensor_id=1,
-            capture_width=1920,
-            capture_height=1080,
+            sensor_id=0,
+            capture_width=3280,
+            capture_height=2464,
             flip_method=0,
             display_width=960,
             display_height=540,
+            framerate=21,
         )
     )
     right_camera.start()

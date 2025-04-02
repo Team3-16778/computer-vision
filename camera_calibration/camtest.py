@@ -29,9 +29,9 @@ while True:
         print("Error: Failed to capture image.")
         break
 
-    frame_re = cv2.resize(frame,(800, 600))
+    frame_re = cv2.resize(frame,(1920, 1080))
     # Display the frame
-    cv2.imshow('Camera Stream', frame_re)
+    cv2.imshow('Camera Stream', frame)
 
     key = cv2.waitKey(1)
     if key%256 == 32:
