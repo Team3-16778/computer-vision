@@ -290,7 +290,7 @@ def calculate_world_3D(camera, u, v, Zc = 0.5): # Zc is the distance from the ca
 #         world_coords = calculate_world_3D(camera, x, y)
 #         # Add a label
 #         label = "({:.2f}, {:.2f}, {:.2f})".format(world_coords[0], world_coords[1], world_coords[2])
-#         cv2.putText(image_rgb, label, (x + 10, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 
+#         cv2.putText(image_rgb, label, (cx + 10, cy - 10), cv2.FONT_HERSHEY_SIMPLEX, 
 #                     0.5, (0, 255, 0), 2)
 #         print(f"World coords: X={world_coords[0]:.2f}, Y={world_coords[1]:.2f}, Z={world_coords[2]:.2f}")
 #     else:
