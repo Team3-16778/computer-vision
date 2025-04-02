@@ -254,38 +254,49 @@ def calculate_world_3D(camera, u, v, Zc = 0.5): # Zc is the distance from the ca
 # Dark Spot Color Mask
 def colormask(image, camera):
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    inv = cv2.bitwise_not(gray)
 
-    # Adaptive threshold to handle occlusion/lighting
-    mask = cv2.adaptiveThreshold(
-        gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, 
-        cv2.THRESH_BINARY_INV, 11, 4
-    )
+    # Blob detector setup
+    params = cv2.SimpleBlobDetector_Params()
+    params.filterByColor = True
+    params.blobColor = 255
 
-    # Morphological filtering: closing to fill gaps, opening to remove noise
-    kernel = np.ones((5, 5), np.uint8)
-    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
-    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+    params.filterByArea = True
+    params.minArea = 20
+    params.maxArea = 1000
 
-    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    params.filterByCircularity = True
+    params.minCircularity = 0.5
 
-    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    masked_image = cv2.bitwise_and(image_rgb, image_rgb, mask=mask)
-    mask_bgr = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+    params.filterByConvexity = False
+    params.filterByInertia = False
 
-    for contour in contours:
-        area = cv2.contourArea(contour)
-        if 30 < area < 1000:  # relaxed min size
-            x, y, w, h = cv2.boundingRect(contour)
-            cx, cy = x + w // 2, y + h // 2
+    detector = cv2.SimpleBlobDetector_create(params)
+    keypoints = detector.detect(inv)
 
-            cv2.rectangle(mask_bgr, (x, y), (x + w, y + h), (0, 255, 0), 2)
-            cv2.drawMarker(mask_bgr, (cx, cy), (255, 0, 0), markerType=cv2.MARKER_CROSS, markerSize=20, thickness=2)
+    # Sort blobs by size (descending) and pick the largest one
+    keypoints = sorted(keypoints, key=lambda k: -k.size)
+    if keypoints:
+        kp = keypoints[0]
+        x, y = int(kp.pt[0]), int(kp.pt[1])
 
-            print(f"Detected partial/occluded spot at ({cx}, {cy})")
-            target_world_3D = calculate_world_3D(camera, cx, cy)
-            print(f"World coordinates:\n X: {target_world_3D[0]}\n Y: {target_world_3D[1]}\n Z: {target_world_3D[2]}")
+        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        output_image = cv2.drawKeypoints(image_rgb, [kp], np.array([]),
+                                         (0, 255, 0), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
 
-    return image_rgb, masked_image, mask_bgr
+        mask = np.zeros_like(gray)
+        cv2.circle(mask, (x, y), int(kp.size / 2), 255, -1)
+        mask_bgr = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+
+        print(f"Target blob at ({x}, {y})")
+        world_coords = calculate_world_3D(camera, x, y)
+        print(f"World coords: X={world_coords[0][0]:.2f}, Y={world_coords[1][0]:.2f}, Z={world_coords[2][0]:.2f}")
+    else:
+        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        output_image = image_rgb.copy()
+        mask_bgr = np.zeros_like(image_rgb)
+
+    return image_rgb, output_image, mask_bgr
 
 
 """
