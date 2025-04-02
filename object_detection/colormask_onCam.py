@@ -251,6 +251,46 @@ def calculate_world_3D(camera, u, v, Zc = 0.5): # Zc is the distance from the ca
     return world_point
 
 
+# Dark Spot Color Mask
+def colormask(image, camera):
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+    # Adaptive threshold to handle occlusion/lighting
+    mask = cv2.adaptiveThreshold(
+        gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, 
+        cv2.THRESH_BINARY_INV, 11, 4
+    )
+
+    # Morphological filtering: closing to fill gaps, opening to remove noise
+    kernel = np.ones((5, 5), np.uint8)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    masked_image = cv2.bitwise_and(image_rgb, image_rgb, mask=mask)
+    mask_bgr = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+
+    for contour in contours:
+        area = cv2.contourArea(contour)
+        if 30 < area < 1000:  # relaxed min size
+            x, y, w, h = cv2.boundingRect(contour)
+            cx, cy = x + w // 2, y + h // 2
+
+            cv2.rectangle(mask_bgr, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            cv2.drawMarker(mask_bgr, (cx, cy), (255, 0, 0), markerType=cv2.MARKER_CROSS, markerSize=20, thickness=2)
+
+            print(f"Detected partial/occluded spot at ({cx}, {cy})")
+            target_world_3D = calculate_world_3D(camera, cx, cy)
+            print(f"World coordinates:\n X: {target_world_3D[0]}\n Y: {target_world_3D[1]}\n Z: {target_world_3D[2]}")
+
+    return image_rgb, masked_image, mask_bgr
+
+
+"""
+
+# Red Color Mask
 def colormask(image, camera):
     # Preprocessing: blur to reduce noise
     blurred = cv2.GaussianBlur(image, (11, 11), 0)
@@ -297,7 +337,7 @@ def colormask(image, camera):
             print(f"The World Coordinate of detected object center: \n X: {target_world_3D[0]} Y: {target_world_3D[1]} Z: {target_world_3D[2]}")
 
     return image_rgb, masked_image, mask_bgr
-
+"""
 
 
 if __name__ == "__main__":
