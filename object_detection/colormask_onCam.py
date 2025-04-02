@@ -244,58 +244,62 @@ def calculate_world_3D(camera, u, v, Zc = 0.5): # Zc is the distance from the ca
     # Method 2: external parameters is T_camera_world
     # world_point = Rotation_matrix.T @ (camera_point - Translation_vector)
 
-    return world_point
+    return world_point.flatten()
 
 
-# Dark Spot Color Mask
-def colormask(image, camera):
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    inv = cv2.bitwise_not(gray)
+# # Dark Spot Color Mask
+# def colormask(image, camera):
+#     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+#     inv = cv2.bitwise_not(gray)
 
-    # Blob detector setup
-    params = cv2.SimpleBlobDetector_Params()
-    params.filterByColor = True
-    params.blobColor = 255
+#     # Blob detector setup
+#     params = cv2.SimpleBlobDetector_Params()
+#     params.filterByColor = True
+#     params.blobColor = 255
 
-    params.filterByArea = True
-    params.minArea = 20
-    params.maxArea = 1000
+#     params.filterByArea = True
+#     params.minArea = 20
+#     params.maxArea = 1000
 
-    params.filterByCircularity = True
-    params.minCircularity = 0.5
+#     params.filterByCircularity = True
+#     params.minCircularity = 0.5
 
-    params.filterByConvexity = False
-    params.filterByInertia = False
+#     params.filterByConvexity = False
+#     params.filterByInertia = False
 
-    detector = cv2.SimpleBlobDetector_create(params)
-    keypoints = detector.detect(inv)
+#     detector = cv2.SimpleBlobDetector_create(params)
+#     keypoints = detector.detect(inv)
 
-    # Sort blobs by size (descending) and pick the largest one
-    keypoints = sorted(keypoints, key=lambda k: -k.size)
-    if keypoints:
-        kp = keypoints[0]
-        x, y = int(kp.pt[0]), int(kp.pt[1])
+#     # Sort blobs by size (descending) and pick the largest one
+#     keypoints = sorted(keypoints, key=lambda k: -k.size)
+#     if keypoints:
+#         kp = keypoints[0]
+#         x, y = int(kp.pt[0]), int(kp.pt[1])
 
-        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        output_image = cv2.drawKeypoints(image_rgb, [kp], np.array([]),
-                                         (0, 255, 0), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+#         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+#         output_image = cv2.drawKeypoints(image_rgb, [kp], np.array([]),
+#                                          (0, 255, 0), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
 
-        mask = np.zeros_like(gray)
-        cv2.circle(mask, (x, y), int(kp.size / 2), 255, -1)
-        mask_bgr = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+#         mask = np.zeros_like(gray)
+#         cv2.circle(mask, (x, y), int(kp.size / 2), 255, -1)
+#         mask_bgr = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
 
-        print(f"Target blob at ({x}, {y})")
-        world_coords = calculate_world_3D(camera, x, y)
-        print(f"World coords: X={world_coords[0][0]:.2f}, Y={world_coords[1][0]:.2f}, Z={world_coords[2][0]:.2f}")
-    else:
-        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        output_image = image_rgb.copy()
-        mask_bgr = np.zeros_like(image_rgb)
+#         print(f"Target blob at ({x}, {y})")
 
-    return image_rgb, output_image, mask_bgr
+#         # Calculate the world coordinate of the Target
+#         world_coords = calculate_world_3D(camera, x, y)
+#         # Add a label
+#         label = "({:.2f}, {:.2f}, {:.2f})".format(world_coords[0], world_coords[1], world_coords[2])
+#         cv2.putText(image_rgb, label, (x + 10, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 
+#                     0.5, (0, 255, 0), 2)
+#         print(f"World coords: X={world_coords[0]:.2f}, Y={world_coords[1]:.2f}, Z={world_coords[2]:.2f}")
+#     else:
+#         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+#         output_image = image_rgb.copy()
+#         mask_bgr = np.zeros_like(image_rgb)
 
+#     return image_rgb, output_image, mask_bgr
 
-"""
 
 # Red Color Mask
 def colormask(image, camera):
@@ -340,11 +344,16 @@ def colormask(image, camera):
             cv2.drawMarker(mask_bgr, (cx, cy), (255, 0, 0), markerType=cv2.MARKER_CROSS, markerSize=20, thickness=2)
 
             print(f"Detected object center: ({cx}, {cy})")
-            target_world_3D = calculate_world_3D(camera, cx, cy)
-            print(f"The World Coordinate of detected object center: \n X: {target_world_3D[0]} Y: {target_world_3D[1]} Z: {target_world_3D[2]}")
+
+            # Calculate the world coordinate of the Target
+            world_coords = calculate_world_3D(camera, x, y)
+            # Add a label
+            label = "({:.2f}, {:.2f}, {:.2f})".format(world_coords[0], world_coords[1], world_coords[2])
+            cv2.putText(image_rgb, label, (cx + 10, cy - 10), cv2.FONT_HERSHEY_SIMPLEX, 
+                        0.5, (0, 255, 0), 2)
+            print(f"World coords: X={world_coords[0]:.2f}, Y={world_coords[1]:.2f}, Z={world_coords[2]:.2f}")
 
     return image_rgb, masked_image, mask_bgr
-"""
 
 
 if __name__ == "__main__":
