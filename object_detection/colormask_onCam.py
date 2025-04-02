@@ -155,8 +155,6 @@ def run_cameras():
             capture_width=3280,
             capture_height=2464,
             flip_method=0,
-            display_width=960,
-            display_height=540,
             framerate=21,
         )
     )
@@ -173,8 +171,6 @@ def run_cameras():
             capture_width=3280,
             capture_height=2464,
             flip_method=0,
-            display_width=960,
-            display_height=540,
             framerate=21,
         )
     )
