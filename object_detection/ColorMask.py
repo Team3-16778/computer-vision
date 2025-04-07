@@ -27,23 +27,69 @@ def calculate_world_3D(camera, u, v, Zc=0.5):
     world_point = R @ camera_point + T
     return world_point.flatten()
 
-class DarkContourTester:
-    def __init__(self, image_dir, camera=None):
+class ColorMaskTuner:
+    def __init__(self, window_name="Color Mask Tuner"):
+        self.window_name = window_name
+        self.lower1 = [0, 100, 100]
+        self.upper1 = [10, 255, 255]
+        self.lower2 = [160, 100, 100]
+        self.upper2 = [179, 255, 255]
+
+        cv2.namedWindow(self.window_name)
+        self._create_trackbars()
+
+    def _create_trackbars(self):
+        for i, (label, default) in enumerate(zip(
+            ["LowH1", "LowS1", "LowV1", "HighH1", "HighS1", "HighV1",
+             "LowH2", "LowS2", "LowV2", "HighH2", "HighS2", "HighV2"],
+            self.lower1 + self.upper1 + self.lower2 + self.upper2)):
+            cv2.createTrackbar(label, self.window_name, default, 255 if 'S' in label or 'V' in label else 179, lambda x: None)
+
+    def _get_trackbar_values(self):
+        vals = [cv2.getTrackbarPos(name, self.window_name) for name in
+                ["LowH1", "LowS1", "LowV1", "HighH1", "HighS1", "HighV1",
+                 "LowH2", "LowS2", "LowV2", "HighH2", "HighS2", "HighV2"]]
+        return vals[:3], vals[3:6], vals[6:9], vals[9:12]
+
+    def apply_mask(self, image):
+        blurred = cv2.GaussianBlur(image, (11, 11), 0)
+        hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
+
+        self.lower1, self.upper1, self.lower2, self.upper2 = self._get_trackbar_values()
+
+        mask1 = cv2.inRange(hsv, np.array(self.lower1), np.array(self.upper1))
+        mask2 = cv2.inRange(hsv, np.array(self.lower2), np.array(self.upper2))
+        mask = cv2.bitwise_or(mask1, mask2)
+
+        kernel = np.ones((5, 5), np.uint8)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+
+        masked_image = cv2.bitwise_and(image, image, mask=mask)
+        mask_bgr = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+        return masked_image, mask_bgr
+
+class ColorMask:
+    def __init__(self, image_dir, camera=None, tuner_enabled=False):
         self.image_dir = image_dir
         self.image_paths = sorted(glob.glob(os.path.join(image_dir, "*.png")))[:3]
         self.camera = camera if camera else MockCamera()
+        self.tuner = ColorMaskTuner() if tuner_enabled else None
 
     def colormask(self, image):
         blurred = cv2.GaussianBlur(image, (11, 11), 0)
         hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
 
-        lower_red1 = np.array([0, 100, 100])
-        upper_red1 = np.array([10, 255, 255])
-        lower_red2 = np.array([160, 100, 100])
-        upper_red2 = np.array([179, 255, 255])
+        if self.tuner:
+            l1, u1, l2, u2 = self.tuner._get_trackbar_values()
+        else:
+            l1 = [0, 100, 100]
+            u1 = [10, 255, 255]
+            l2 = [160, 100, 100]
+            u2 = [179, 255, 255]
 
-        mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
-        mask2 = cv2.inRange(hsv, lower_red2, upper_red2)
+        mask1 = cv2.inRange(hsv, np.array(l1), np.array(u1))
+        mask2 = cv2.inRange(hsv, np.array(l2), np.array(u2))
         mask = cv2.bitwise_or(mask1, mask2)
 
         kernel = np.ones((5, 5), np.uint8)
@@ -72,7 +118,7 @@ class DarkContourTester:
                 print(f"World coords: X={world_coords[0]:.2f}, Y={world_coords[1]:.2f}, Z={world_coords[2]:.2f}")
 
         return image_rgb, masked_image, mask_bgr
-
+    
     def run(self):
         for i, image_path in enumerate(self.image_paths):
             image = cv2.imread(image_path)
@@ -89,11 +135,43 @@ class DarkContourTester:
                 cv2.resize(mask_bgr, (640, 480))
             ))
             cv2.imshow(f"Result {i+1}: {os.path.basename(image_path)}", stacked)
-            cv2.waitKey(0)
+            key = cv2.waitKey(0)
+            if key == 27:  # ESC to break early
+                break
+        cv2.destroyAllWindows()
+
+    def run_live_tuning(self):
+        if not self.image_paths:
+            print("No images found in directory.")
+            return
+
+        image = cv2.imread(self.image_paths[0])
+        if image is None:
+            print(f"Could not read {self.image_paths[0]}")
+            return
+
+        while True:
+            display_img = image.copy()
+            _, output_image, mask_bgr = self.colormask(display_img)
+
+            stacked = np.hstack((
+                cv2.resize(image, (640, 480)),
+                cv2.resize(output_image, (640, 480)),
+                cv2.resize(mask_bgr, (640, 480))
+            ))
+
+            cv2.imshow("Live Mask Tuning", stacked)
+
+            key = cv2.waitKey(1) & 0xFF
+            if key == 27:  # ESC
+                break
 
         cv2.destroyAllWindows()
 
+
+
 if __name__ == "__main__":
     image_dir = "/Users/meesh/Desktop/CMU/MechDesign/computer-vision/object_detection/images/ribcage"  # Update this path
-    tester = DarkContourTester(image_dir)
-    tester.run()
+    tester = ColorMask(image_dir, tuner_enabled=True)
+    tester.run_live_tuning()
+
