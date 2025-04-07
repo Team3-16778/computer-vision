@@ -28,7 +28,7 @@ def calculate_world_3D(camera, u, v, Zc=0.5):
     return world_point.flatten()
 
 class ColorMaskTuner:
-    def __init__(self, window_name="Color Mask Tuner"):
+    def __init__(self, window_name="Live Mask Tuning"):  # <-- unified window name
         self.window_name = window_name
         self.lower1 = [0, 100, 100]
         self.upper1 = [10, 255, 255]
@@ -39,17 +39,41 @@ class ColorMaskTuner:
         self._create_trackbars()
 
     def _create_trackbars(self):
-        for i, (label, default) in enumerate(zip(
-            ["LowH1", "LowS1", "LowV1", "HighH1", "HighS1", "HighV1",
-             "LowH2", "LowS2", "LowV2", "HighH2", "HighS2", "HighV2"],
-            self.lower1 + self.upper1 + self.lower2 + self.upper2)):
-            cv2.createTrackbar(label, self.window_name, default, 255 if 'S' in label or 'V' in label else 179, lambda x: None)
+        ranges = [
+            ("[Range 1] Low H", self.lower1[0], 179),
+            ("[Range 1] Low S", self.lower1[1], 255),
+            ("[Range 1] Low V", self.lower1[2], 255),
+            ("[Range 1] High H", self.upper1[0], 179),
+            ("[Range 1] High S", self.upper1[1], 255),
+            ("[Range 1] High V", self.upper1[2], 255),
+            ("", 0, 1),  # spacer
+            ("[Range 2] Low H", self.lower2[0], 179),
+            ("[Range 2] Low S", self.lower2[1], 255),
+            ("[Range 2] Low V", self.lower2[2], 255),
+            ("[Range 2] High H", self.upper2[0], 179),
+            ("[Range 2] High S", self.upper2[1], 255),
+            ("[Range 2] High V", self.upper2[2], 255),
+        ]
+
+        for label, default, max_val in ranges:
+            # If it's a spacer, use a dummy no-op trackbar
+            if label == "":
+                cv2.createTrackbar(" ", self.window_name, 0, 1, lambda x: None)
+            else:
+                cv2.createTrackbar(label, self.window_name, default, max_val, lambda x: None)
+
+
 
     def _get_trackbar_values(self):
-        vals = [cv2.getTrackbarPos(name, self.window_name) for name in
-                ["LowH1", "LowS1", "LowV1", "HighH1", "HighS1", "HighV1",
-                 "LowH2", "LowS2", "LowV2", "HighH2", "HighS2", "HighV2"]]
+        names = [
+            "[Range 1] Low H", "[Range 1] Low S", "[Range 1] Low V",
+            "[Range 1] High H", "[Range 1] High S", "[Range 1] High V",
+            "[Range 2] Low H", "[Range 2] Low S", "[Range 2] Low V",
+            "[Range 2] High H", "[Range 2] High S", "[Range 2] High V"
+        ]
+        vals = [cv2.getTrackbarPos(name, self.window_name) for name in names]
         return vals[:3], vals[3:6], vals[6:9], vals[9:12]
+
 
     def apply_mask(self, image):
         blurred = cv2.GaussianBlur(image, (11, 11), 0)
@@ -145,28 +169,38 @@ class ColorMask:
             print("No images found in directory.")
             return
 
-        image = cv2.imread(self.image_paths[0])
-        if image is None:
-            print(f"Could not read {self.image_paths[0]}")
-            return
+        index = 0  # start with first image
 
-        while True:
-            display_img = image.copy()
-            _, output_image, mask_bgr = self.colormask(display_img)
+        while index < len(self.image_paths):
+            image = cv2.imread(self.image_paths[index])
+            if image is None:
+                print(f"Could not read {self.image_paths[index]}")
+                index += 1
+                continue
 
-            stacked = np.hstack((
-                cv2.resize(image, (640, 480)),
-                cv2.resize(output_image, (640, 480)),
-                cv2.resize(mask_bgr, (640, 480))
-            ))
+            while True:
+                display_img = image.copy()
+                _, output_image, mask_bgr = self.colormask(display_img)
 
-            cv2.imshow("Live Mask Tuning", stacked)
+                stacked = np.hstack((
+                    cv2.resize(image, (640, 480)),
+                    cv2.resize(output_image, (640, 480)),
+                    cv2.resize(mask_bgr, (640, 480))
+                ))
 
-            key = cv2.waitKey(1) & 0xFF
-            if key == 27:  # ESC
-                break
+                cv2.imshow(self.tuner.window_name, stacked)
+
+                key = cv2.waitKey(1) & 0xFF
+                if key == 27:  # ESC to exit completely
+                    cv2.destroyAllWindows()
+                    return
+                elif key == 32:  # SPACE to go to next image
+                    break  # break inner loop, advance index
+
+            index += 1
 
         cv2.destroyAllWindows()
+
 
 
 
