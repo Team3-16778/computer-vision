@@ -84,13 +84,40 @@ class ColorMask(QWidget):
         lower, upper = self.get_hsv_bounds()
         mask = cv2.inRange(hsv, lower, upper)
 
-        result = cv2.bitwise_and(image, image, mask=mask)
-        display = np.hstack((image, result, cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)))
+        # Morphological cleanup
+        kernel = np.ones((5, 5), np.uint8)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+
+        # Blob detection
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        overlay = image.copy()
+        masked = cv2.bitwise_and(image, image, mask=mask)
+
+        if contours:
+            largest = max(contours, key=cv2.contourArea)
+            x, y, w, h = cv2.boundingRect(largest)
+            cx, cy = x + w // 2, y + h // 2
+
+            # Draw on overlay
+            cv2.rectangle(overlay, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            cv2.circle(overlay, (cx, cy), 5, (255, 0, 0), -1)  # blue center
+
+            # Draw on masked
+            cv2.rectangle(masked, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            cv2.circle(masked, (cx, cy), 5, (255, 0, 0), -1)  # blue center
+
+            print(f"Target blob at ({cx}, {cy})")
+            # world_coords = calculate_world_3D(self.camera, cx, cy)
+            # print(f"World coords: X={world_coords[0]:.2f}, Y={world_coords[1]:.2f}, Z={world_coords[2]:.2f}")
+
+        # Final side-by-side view
+        display = np.hstack((image, masked, overlay))
         display = cv2.resize(display, (960, 320))
         display_rgb = cv2.cvtColor(display, cv2.COLOR_BGR2RGB)
 
-        self.display_img = display_rgb  # Save for eyedropper
-        h, w, ch = display.shape
+        self.display_img = display_rgb
+        h, w, ch = display_rgb.shape
         qimg = QImage(display_rgb.data, w, h, ch * w, QImage.Format.Format_RGB888)
         self.label.setPixmap(QPixmap.fromImage(qimg))
 
