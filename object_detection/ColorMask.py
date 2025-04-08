@@ -91,8 +91,8 @@ class ColorMask(QWidget):
             x, y, w, h = cv2.boundingRect(largest)
             cx, cy = x + w // 2, y + h // 2
             for img in [overlay, masked]:
-                cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
-                cv2.circle(img, (cx, cy), 5, (255, 0, 0), -1)
+                cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 20)
+                cv2.circle(img, (cx, cy), 5, (255, 255, 0), 3)
             target_found = True
 
         return masked, overlay, target_found
