@@ -1,8 +1,6 @@
 import sys
 import cv2
 import numpy as np
-import os
-import glob
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QLabel, QVBoxLayout, QGridLayout,
     QSlider, QSpinBox, QPushButton, QHBoxLayout
@@ -11,16 +9,16 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QImage, QPixmap, QMouseEvent
 
 class ColorMask(QWidget):
-    def __init__(self, image_dir):
-        super().__init__()
-        self.setWindowTitle("Color Mask Tuner with Dual Hue Support")
-        self.image_paths = sorted(glob.glob(os.path.join(image_dir, '*.png')))
-        self.index = 0
+    def __init__(self, camera_name="Camera", parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(f"Color Mask Tuner - {camera_name}")
+        self.setGeometry(100, 100, 1000, 600)
 
         self.label = QLabel()
         self.label.setMouseTracking(True)
         self.label.mousePressEvent = self.pick_color
         self.display_img = None
+        self.current_frame = None
 
         self.sliders = {}
         self.init_ui()
@@ -32,10 +30,6 @@ class ColorMask(QWidget):
     def init_ui(self):
         layout = QVBoxLayout()
         layout.addWidget(self.label)
-
-        next_btn = QPushButton("Next Image")
-        next_btn.clicked.connect(self.next_image)
-        layout.addWidget(next_btn)
 
         grid = QGridLayout()
         hsv_names = ["Low H", "Low S", "Low V", "High H", "High S", "High V"]
@@ -64,9 +58,6 @@ class ColorMask(QWidget):
         layout.addLayout(grid)
         self.setLayout(layout)
 
-    def next_image(self):
-        self.index = (self.index + 1) % len(self.image_paths)
-
     def get_hsv_bounds(self):
         l1 = np.array([self.sliders[f"Low H1"].value(), self.sliders[f"Low S1"].value(), self.sliders[f"Low V1"].value()])
         u1 = np.array([self.sliders[f"High H1"].value(), self.sliders[f"High S1"].value(), self.sliders[f"High V1"].value()])
@@ -74,15 +65,11 @@ class ColorMask(QWidget):
         u2 = np.array([self.sliders[f"High H2"].value(), self.sliders[f"High S2"].value(), self.sliders[f"High V2"].value()])
         return l1, u1, l2, u2
 
-    def update_frame(self):
-        if not self.image_paths:
-            return
+    def set_frame(self, frame):
+        self.current_frame = frame.copy()
 
-        image = cv2.imread(self.image_paths[self.index])
-        if image is None:
-            return
-
-        blurred = cv2.GaussianBlur(image, (7, 7), 0)
+    def process_frame(self, frame):
+        blurred = cv2.GaussianBlur(frame, (7, 7), 0)
         hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
         l1, u1, l2, u2 = self.get_hsv_bounds()
 
@@ -95,9 +82,10 @@ class ColorMask(QWidget):
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
 
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        overlay = image.copy()
-        masked = cv2.bitwise_and(image, image, mask=mask)
+        overlay = frame.copy()
+        masked = cv2.bitwise_and(frame, frame, mask=mask)
 
+        target_found = False
         if contours:
             largest = max(contours, key=cv2.contourArea)
             x, y, w, h = cv2.boundingRect(largest)
@@ -105,9 +93,17 @@ class ColorMask(QWidget):
             for img in [overlay, masked]:
                 cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
                 cv2.circle(img, (cx, cy), 5, (255, 0, 0), -1)
-            print(f"Target blob at ({cx}, {cy})")
+            target_found = True
 
-        display = np.hstack((image, masked, overlay))
+        return masked, overlay, target_found
+
+    def update_frame(self):
+        if self.current_frame is None:
+            return
+
+        frame = self.current_frame.copy()
+        masked, overlay, _ = self.process_frame(frame)
+        display = np.hstack((frame, masked, overlay))
         display = cv2.resize(display, (960, 320))
         display_rgb = cv2.cvtColor(display, cv2.COLOR_BGR2RGB)
 
@@ -117,17 +113,13 @@ class ColorMask(QWidget):
         self.label.setPixmap(QPixmap.fromImage(qimg))
 
     def pick_color(self, event: QMouseEvent):
-        if self.display_img is None or not self.image_paths:
+        if self.display_img is None or self.current_frame is None:
             return
 
         x_disp = int(event.position().x())
         y_disp = int(event.position().y())
 
-        orig_image = cv2.imread(self.image_paths[self.index])
-        if orig_image is None:
-            return
-        h_orig, w_orig = orig_image.shape[:2]
-
+        h_orig, w_orig = self.current_frame.shape[:2]
         panel_width = self.display_img.shape[1] // 3
         if x_disp > panel_width:
             return
@@ -137,7 +129,7 @@ class ColorMask(QWidget):
         x = int(x_disp * x_ratio)
         y = int(y_disp * y_ratio)
 
-        hsv = cv2.cvtColor(orig_image, cv2.COLOR_BGR2HSV)
+        hsv = cv2.cvtColor(self.current_frame, cv2.COLOR_BGR2HSV)
 
         radius = 2
         x1, x2 = max(0, x - radius), min(w_orig, x + radius + 1)
@@ -150,7 +142,6 @@ class ColorMask(QWidget):
         high = np.clip(median + margin, [0, 0, 0], [179, 255, 255]).astype(int)
 
         if low[0] <= high[0]:
-            # Normal range
             self.sliders["Low H1"].setValue(int(low[0]))
             self.sliders["Low S1"].setValue(int(low[1]))
             self.sliders["Low V1"].setValue(int(low[2]))
@@ -160,7 +151,6 @@ class ColorMask(QWidget):
             self.sliders["Low H2"].setValue(0)
             self.sliders["High H2"].setValue(0)
         else:
-            # Wraparound case
             self.sliders["Low H1"].setValue(0)
             self.sliders["High H1"].setValue(int(high[0]))
             self.sliders["Low H2"].setValue(int(low[0]))
@@ -179,6 +169,17 @@ class ColorMask(QWidget):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    cm = ColorMask("/Users/meesh/Desktop/CMU/MechDesign/computer-vision/object_detection/images/ribcage")
-    cm.show()
+    demo = ColorMask("Demo Camera")
+    cap = cv2.VideoCapture(0)
+
+    def feed():
+        ret, frame = cap.read()
+        if ret:
+            demo.set_frame(frame)
+
+    timer = QTimer()
+    timer.timeout.connect(feed)
+    timer.start(30)
+
+    demo.show()
     sys.exit(app.exec())
