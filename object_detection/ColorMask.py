@@ -5,15 +5,15 @@ import os
 import glob
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QLabel, QVBoxLayout, QGridLayout,
-    QSlider, QSpinBox, QPushButton
+    QSlider, QSpinBox, QPushButton, QHBoxLayout
 )
-from PyQt6.QtCore import Qt, QTimer, QPoint
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QImage, QPixmap, QMouseEvent
 
 class ColorMask(QWidget):
     def __init__(self, image_dir):
         super().__init__()
-        self.setWindowTitle("Color Mask Tuner with Eyedropper")
+        self.setWindowTitle("Color Mask Tuner with Dual Hue Support")
         self.image_paths = sorted(glob.glob(os.path.join(image_dir, '*.png')))
         self.index = 0
 
@@ -33,43 +33,46 @@ class ColorMask(QWidget):
         layout = QVBoxLayout()
         layout.addWidget(self.label)
 
-        # Button to go to next image
         next_btn = QPushButton("Next Image")
         next_btn.clicked.connect(self.next_image)
         layout.addWidget(next_btn)
 
-        # HSV Sliders
-        slider_layout = QGridLayout()
-        names = ["Low H", "Low S", "Low V", "High H", "High S", "High V"]
-        default_values = [0, 100, 100, 179, 255, 255]
+        grid = QGridLayout()
+        hsv_names = ["Low H", "Low S", "Low V", "High H", "High S", "High V"]
+        default_values1 = [0, 100, 100, 10, 255, 255]
+        default_values2 = [160, 100, 100, 179, 255, 255]
 
-        for i, (name, val) in enumerate(zip(names, default_values)):
-            lbl = QLabel(name)
-            sld = QSlider(Qt.Orientation.Horizontal)
-            sld.setRange(0, 255 if 'S' in name or 'V' in name else 179)
-            sld.setValue(val)
-            spn = QSpinBox()
-            spn.setRange(0, 255 if 'S' in name or 'V' in name else 179)
-            spn.setValue(val)
-            sld.valueChanged.connect(spn.setValue)
-            spn.valueChanged.connect(sld.setValue)
-            sld.valueChanged.connect(self.update_frame)
+        for col, (suffix, defaults) in enumerate(zip(['1', '2'], [default_values1, default_values2])):
+            for row, (name, val) in enumerate(zip(hsv_names, defaults)):
+                full_name = f"{name}{suffix}"
+                lbl = QLabel(full_name)
+                sld = QSlider(Qt.Orientation.Horizontal)
+                sld.setRange(0, 255 if 'S' in name or 'V' in name else 179)
+                sld.setValue(val)
+                spn = QSpinBox()
+                spn.setRange(0, 255 if 'S' in name or 'V' in name else 179)
+                spn.setValue(val)
+                sld.valueChanged.connect(spn.setValue)
+                spn.valueChanged.connect(sld.setValue)
+                sld.valueChanged.connect(self.update_frame)
 
-            self.sliders[name] = spn
-            slider_layout.addWidget(lbl, i, 0)
-            slider_layout.addWidget(sld, i, 1)
-            slider_layout.addWidget(spn, i, 2)
+                self.sliders[full_name] = spn
+                grid.addWidget(lbl, row, col * 3 + 0)
+                grid.addWidget(sld, row, col * 3 + 1)
+                grid.addWidget(spn, row, col * 3 + 2)
 
-        layout.addLayout(slider_layout)
+        layout.addLayout(grid)
         self.setLayout(layout)
 
     def next_image(self):
         self.index = (self.index + 1) % len(self.image_paths)
 
     def get_hsv_bounds(self):
-        l = [self.sliders[f"Low H"].value(), self.sliders[f"Low S"].value(), self.sliders[f"Low V"].value()]
-        u = [self.sliders[f"High H"].value(), self.sliders[f"High S"].value(), self.sliders[f"High V"].value()]
-        return np.array(l), np.array(u)
+        l1 = np.array([self.sliders[f"Low H1"].value(), self.sliders[f"Low S1"].value(), self.sliders[f"Low V1"].value()])
+        u1 = np.array([self.sliders[f"High H1"].value(), self.sliders[f"High S1"].value(), self.sliders[f"High V1"].value()])
+        l2 = np.array([self.sliders[f"Low H2"].value(), self.sliders[f"Low S2"].value(), self.sliders[f"Low V2"].value()])
+        u2 = np.array([self.sliders[f"High H2"].value(), self.sliders[f"High S2"].value(), self.sliders[f"High V2"].value()])
+        return l1, u1, l2, u2
 
     def update_frame(self):
         if not self.image_paths:
@@ -81,15 +84,16 @@ class ColorMask(QWidget):
 
         blurred = cv2.GaussianBlur(image, (7, 7), 0)
         hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
-        lower, upper = self.get_hsv_bounds()
-        mask = cv2.inRange(hsv, lower, upper)
+        l1, u1, l2, u2 = self.get_hsv_bounds()
 
-        # Morphological cleanup
+        mask1 = cv2.inRange(hsv, l1, u1)
+        mask2 = cv2.inRange(hsv, l2, u2)
+        mask = cv2.bitwise_or(mask1, mask2)
+
         kernel = np.ones((5, 5), np.uint8)
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
 
-        # Blob detection
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         overlay = image.copy()
         masked = cv2.bitwise_and(image, image, mask=mask)
@@ -98,20 +102,11 @@ class ColorMask(QWidget):
             largest = max(contours, key=cv2.contourArea)
             x, y, w, h = cv2.boundingRect(largest)
             cx, cy = x + w // 2, y + h // 2
-
-            # Draw on overlay
-            cv2.rectangle(overlay, (x, y), (x + w, y + h), (0, 255, 0), 2)
-            cv2.circle(overlay, (cx, cy), 5, (255, 0, 0), -1)  # blue center
-
-            # Draw on masked
-            cv2.rectangle(masked, (x, y), (x + w, y + h), (0, 255, 0), 2)
-            cv2.circle(masked, (cx, cy), 5, (255, 0, 0), -1)  # blue center
-
+            for img in [overlay, masked]:
+                cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                cv2.circle(img, (cx, cy), 5, (255, 0, 0), -1)
             print(f"Target blob at ({cx}, {cy})")
-            # world_coords = calculate_world_3D(self.camera, cx, cy)
-            # print(f"World coords: X={world_coords[0]:.2f}, Y={world_coords[1]:.2f}, Z={world_coords[2]:.2f}")
 
-        # Final side-by-side view
         display = np.hstack((image, masked, overlay))
         display = cv2.resize(display, (960, 320))
         display_rgb = cv2.cvtColor(display, cv2.COLOR_BGR2RGB)
@@ -125,31 +120,25 @@ class ColorMask(QWidget):
         if self.display_img is None or not self.image_paths:
             return
 
-        # Click coordinates in the display (resized + side-by-side layout)
         x_disp = int(event.position().x())
         y_disp = int(event.position().y())
 
-        # Define original image resolution
         orig_image = cv2.imread(self.image_paths[self.index])
         if orig_image is None:
             return
         h_orig, w_orig = orig_image.shape[:2]
 
-        # Assume 3 panels side-by-side, equally divided (original, masked, mask)
         panel_width = self.display_img.shape[1] // 3
         if x_disp > panel_width:
-            return  # Only allow picking on the first (original) panel
+            return
 
-        # Scale coordinates to original image resolution
         x_ratio = w_orig / panel_width
         y_ratio = h_orig / self.display_img.shape[0]
         x = int(x_disp * x_ratio)
         y = int(y_disp * y_ratio)
 
-        # Convert to HSV
         hsv = cv2.cvtColor(orig_image, cv2.COLOR_BGR2HSV)
 
-        # Sample 5x5 patch and use median
         radius = 2
         x1, x2 = max(0, x - radius), min(w_orig, x + radius + 1)
         y1, y2 = max(0, y - radius), min(h_orig, y + radius + 1)
@@ -160,15 +149,33 @@ class ColorMask(QWidget):
         low = np.clip(median - margin, [0, 0, 0], [179, 255, 255]).astype(int)
         high = np.clip(median + margin, [0, 0, 0], [179, 255, 255]).astype(int)
 
-        self.sliders["Low H"].setValue(low[0])
-        self.sliders["Low S"].setValue(low[1])
-        self.sliders["Low V"].setValue(low[2])
-        self.sliders["High H"].setValue(high[0])
-        self.sliders["High S"].setValue(high[1])
-        self.sliders["High V"].setValue(high[2])
+        if low[0] <= high[0]:
+            # Normal range
+            self.sliders["Low H1"].setValue(int(low[0]))
+            self.sliders["Low S1"].setValue(int(low[1]))
+            self.sliders["Low V1"].setValue(int(low[2]))
+            self.sliders["High H1"].setValue(int(high[0]))
+            self.sliders["High S1"].setValue(int(high[1]))
+            self.sliders["High V1"].setValue(int(high[2]))
+            self.sliders["Low H2"].setValue(0)
+            self.sliders["High H2"].setValue(0)
+        else:
+            # Wraparound case
+            self.sliders["Low H1"].setValue(0)
+            self.sliders["High H1"].setValue(int(high[0]))
+            self.sliders["Low H2"].setValue(int(low[0]))
+            self.sliders["High H2"].setValue(179)
+
+        self.sliders["Low S1"].setValue(int(low[1]))
+        self.sliders["Low V1"].setValue(int(low[2]))
+        self.sliders["High S1"].setValue(int(high[1]))
+        self.sliders["High V1"].setValue(int(high[2]))
+        self.sliders["Low S2"].setValue(int(low[1]))
+        self.sliders["Low V2"].setValue(int(low[2]))
+        self.sliders["High S2"].setValue(int(high[1]))
+        self.sliders["High V2"].setValue(int(high[2]))
 
         self.update_frame()
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
