@@ -43,7 +43,7 @@ while True:
         print("Can't receive frame. Exiting ...")
         break
     #frame_re = cv2.resize(frame,(800, 600))
-    frame_re = frame
+    frame_re = frame.copy()
 
     # Detect the markers in the frame
     corners, ids, rejected = aruco.detectMarkers(frame_re, aruco_dict, parameters=parameters)
@@ -69,8 +69,10 @@ while True:
     if key%256 == 32:
         # SPACE is pressed: save test images 
         img_num += 1
-        img_file_name = test_dir + '/test_' + str(img_num) + '.png'
+        img_file_name = test_dir + '/test_' + str(img_num) + '_0414.png'
         cv2.imwrite(img_file_name, frame_with_markers) 
+        img_file_name_2 = test_dir + '/test_' + str(img_num) + '_0414_2.png'
+        cv2.imwrite(img_file_name_2, frame) 
     if key & 0xFF == ord('q'):
         # 'q' key is pressed: exit the loop
         break

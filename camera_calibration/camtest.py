@@ -1,7 +1,7 @@
 import cv2
 
 # Replace '/dev/video0' with the correct video device if it's different (use 'v4l2-ctl --list-devices' to check)
-sensor_id = 1
+sensor_id = 0
 
 # Open the camera
 # cap = cv2.VideoCapture(camera_device, cv2.CAP_V4L2) # V4L2 can only support 8bit bayer, DONT USE!!! https://forums.developer.nvidia.com/t/green-screen-issue-on-nvidia-jetson-nano-and-raspberry-pi-v2-1-camera/220945/7
@@ -20,7 +20,7 @@ if not cap.isOpened():
 
 print("Streaming... Press 'q' to quit")
 
-img_num = 10
+img_num = 20
 while True:
     # Read a frame from the camera
     ret, frame = cap.read()

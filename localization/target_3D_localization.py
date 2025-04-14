@@ -12,7 +12,7 @@ dist_coeffs = internal_data["dist_coeffs"]
 print("Camera Matrix: \n", camera_matrix)
 print("Distortion Coefficients: \n", dist_coeffs)
 
-camera_external_file = dir_path + "/cam2_external_parameters_2.npz"
+camera_external_file = dir_path + "/cam2_external_parameters_0414.npz"
 T_world_camera = np.load(camera_external_file)["T_world_camera"]
 print("T_world_camera:\n", T_world_camera)
 

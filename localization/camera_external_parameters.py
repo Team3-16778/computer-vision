@@ -57,18 +57,22 @@ parameters = aruco.DetectorParameters()
 # Assuming we are using markers with IDs 1 and 2
 # Define the world transformation matrix (4x4) for each marker
 marker_world_poses = {
-    0: np.array([[1, 0, 0, 0.0],    # marker 0 is located at (0, 0, 0) meters
+    4: np.array([[1, 0, 0, 0.0],    # marker 0 is located at (0, 0, 0) meters
                  [0, 1, 0, 0.0],
                  [0, 0, 1, 0.0],
                  [0, 0, 0, 1]]),
-    1: np.array([[1, 0, 0, 0.5],   # marker 1 is located at (0.5, 0, 0) meters
-                 [0, 1, 0, 0.0],
+    10: np.array([[1, 0, 0, 0.003175],   # marker 2 is located at (-0.4492625, 0.003175, 0) meters
+                 [0, 1, 0, 0.4492625],
                  [0, 0, 1, 0.0],
-                 [0, 0, 0, 1]])
+                 [0, 0, 0, 1]]),
+    3: np.array([[1, 0, 0, 0.003175+0.473075],   # marker 3 is located at (-0.4492625, 0.003175+0.473075, 0) meters
+                 [0, 1, 0, 0.4492625],
+                 [0, 0, 1, 0.0],
+                 [0, 0, 0, 1]])    
 }
 
 # 4. Read the image and detect ArUco markers
-img_file = dir_path + "/cam2_test_img_new_1.png" #img size (3280x2464)
+img_file = dir_path + "/cam2_test_img_0414.png" #img size (3280x2464)
 img = cv2.imread(img_file)  # change the path to your image
 gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 corners, ids, _ = aruco.detectMarkers(img, aruco_dict, parameters=parameters)
@@ -126,6 +130,6 @@ else:
 
 
 # 7. Save the camera pose to a file
-save_file = dir_path + "/cam2_external_parameters_2.npz"
+save_file = dir_path + "/cam2_external_parameters_0414.npz"
 np.savez(save_file, T_world_camera=T_avg)
 
