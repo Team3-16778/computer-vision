@@ -12,11 +12,11 @@ dist_coeffs = internal_data["dist_coeffs"]
 print("Camera Matrix: \n", camera_matrix)
 print("Distortion Coefficients: \n", dist_coeffs)
 
-camera_external_file = dir_path + "/cam2_external_parameters_0414.npz"
+camera_external_file = dir_path + "/cam2_external_parameters_0415.npz"
 T_world_camera = np.load(camera_external_file)["T_world_camera"]
 print("T_world_camera:\n", T_world_camera)
 
-def calculate_world_3D(u, v, Zc = 0.5): # Zc is the distance from the camera to the target(default is a random value)
+def calculate_world_3D(u, v, Zc = 0.6731): # Zc is the distance from the camera to the target(tag-cam distance get from T_world_camera 0.69846859)
     """
     Calculate the 3D coordinates of the target in the world frame
     Input:

@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 import cv2.aruco as aruco
 from scipy.spatial.transform import Rotation as R
+from target_3D_localization import calculate_world_3D
 
 # Find the current working directory
 dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -61,12 +62,12 @@ marker_world_poses = {
                  [0, 1, 0, 0.0],
                  [0, 0, 1, 0.0],
                  [0, 0, 0, 1]]),
-    10: np.array([[1, 0, 0, 0.003175],   # marker 2 is located at (-0.4492625, 0.003175, 0) meters
-                 [0, 1, 0, 0.4492625],
+    10: np.array([[1, 0, 0, 0.003175],   # marker 10 is located at (-0.4492625, 0.003175, 0) meters
+                 [0, 1, 0, -0.4492625],
                  [0, 0, 1, 0.0],
                  [0, 0, 0, 1]]),
     3: np.array([[1, 0, 0, 0.003175+0.473075],   # marker 3 is located at (-0.4492625, 0.003175+0.473075, 0) meters
-                 [0, 1, 0, 0.4492625],
+                 [0, 1, 0, -0.4492625],
                  [0, 0, 1, 0.0],
                  [0, 0, 0, 1]])    
 }
@@ -81,8 +82,8 @@ if ids is None:
     exit()
 else:
     print("ArUco markers' ID detected in the image: ", ' '.join(str(item) for row in ids for item in row))
-
-img_with_markers = aruco.drawDetectedMarkers(img, corners, ids)
+img_with_markers = img.copy()
+img_with_markers = aruco.drawDetectedMarkers(img_with_markers, corners, ids)
 
 
 # 5. Estimate the poses of the markers, and compute the world transformation matrix of camera for each marker
@@ -130,6 +131,25 @@ else:
 
 
 # 7. Save the camera pose to a file
-save_file = dir_path + "/cam2_external_parameters_0414.npz"
+save_file = dir_path + "/cam2_external_parameters_0415.npz"
 np.savez(save_file, T_world_camera=T_avg)
 
+# 8. test the external parameters on the original image
+# for each corner, use calculate 3d to get the world cordinate, and make a label on the image
+for i, marker_id in enumerate(ids.flatten()):
+    u, v = np.mean(corners[i][0], axis=0)
+    world_3d = calculate_world_3D(u,v)
+    world_3d = world_3d.flatten()
+    label1 = "pixel({},{})".format(u,v)
+    label2 = "world({:.3f},{:.3f},{:.3f})".format(world_3d[0],world_3d[1],world_3d[2])
+    cv2.putText(img, label1, (int(u)+5,int(v)-5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+    cv2.putText(img, label2, (int(u)+5,int(v)+10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+# show the image and save
+while True:
+    cv2.imshow("Test",img)
+    key = cv2.waitKey(1)
+    if key == 27:  # Esc key to exit
+        break
+img_test_name = 'test_0415.png'
+cv2.imwrite(img_test_name, img) 
+cv2.destroyAllWindows()
