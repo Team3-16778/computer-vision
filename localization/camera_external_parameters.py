@@ -58,7 +58,7 @@ parameters = aruco.DetectorParameters()
 # Assuming we are using markers with IDs 1 and 2
 # Define the world transformation matrix (4x4) for each marker
 marker_world_poses = {
-    4: np.array([[1, 0, 0, 0.0],    # marker 0 is located at (0, 0, 0) meters
+    4: np.array([[1, 0, 0, 0.0],    # marker 4 is located at (0, 0, 0) meters
                  [0, 1, 0, 0.0],
                  [0, 0, 1, 0.0],
                  [0, 0, 0, 1]]),
@@ -73,7 +73,7 @@ marker_world_poses = {
 }
 
 # 4. Read the image and detect ArUco markers
-img_file = dir_path + "/cam2_test_img_0414.png" #img size (3280x2464)
+img_file = dir_path + "/cam2_test_img_0424.png" #img size (3280x2464)
 img = cv2.imread(img_file)  # change the path to your image
 gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 corners, ids, _ = aruco.detectMarkers(img, aruco_dict, parameters=parameters)
@@ -131,7 +131,7 @@ else:
 
 
 # 7. Save the camera pose to a file
-save_file = dir_path + "/cam2_external_parameters_0415.npz"
+save_file = dir_path + "/cam2_external_parameters_0424.npz"
 np.savez(save_file, T_world_camera=T_avg)
 
 # 8. test the external parameters on the original image
@@ -150,6 +150,6 @@ while True:
     key = cv2.waitKey(1)
     if key == 27:  # Esc key to exit
         break
-img_test_name = 'test_0415.png'
+img_test_name = 'test_0424.png'
 cv2.imwrite(img_test_name, img) 
 cv2.destroyAllWindows()
