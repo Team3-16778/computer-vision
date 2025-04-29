@@ -4,10 +4,8 @@ import numpy as np
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
-
 # Camera Stream
 w_original, h_original, framerate_original = 3280, 2464, 21
-
 w_new, h_new, framerate_new = 1280, 720, 60
 
 # cap = cv2.VideoCapture(0)  # Open the default camera
@@ -25,21 +23,15 @@ dist_coeffs = internal_data["dist_coeffs"]
 print("Camera Matrix: \n", camera_matrix)
 print("Distortion Coefficients: \n", dist_coeffs)
 
-# Scaling factors
-scale_x = w_new / w_original
-scale_y = h_new / h_original
-
-# Scale the intrinsic matrix
-camera_matrix_scaled = camera_matrix.copy()
-camera_matrix_scaled[0, 0] *= scale_x  # fx_new
-camera_matrix_scaled[1, 1] *= scale_y  # fy_new
-camera_matrix_scaled[0, 2] *= scale_x  # cx_new
-camera_matrix_scaled[1, 2] *= scale_y  # cy_new
-camera_matrix = camera_matrix_scaled
-
 camera_external_file = dir_path + "/cam2_external_parameters_0424.npz"
 T_world_camera = np.load(camera_external_file)["T_world_camera"]
 print("T_world_camera:\n", T_world_camera)
+
+# Parameters from transfering function(calculate_mode_transfer.py)
+scale_x = 0.50049686
+scale_y = 0.5006737
+offset_x = 361.1
+offset_y = 513.5
 
 def calculate_world_3D(u, v, Zc = 0.6731): # Zc is the distance from the camera to the target(tag-cam distance get from T_world_camera 0.69846859)
     """
@@ -51,6 +43,10 @@ def calculate_world_3D(u, v, Zc = 0.6731): # Zc is the distance from the camera 
     Output:
         world_point: 3D coordinates of the target in the world frame
     """
+    # 1. Convert Mode 4 (u, v) to Mode 0 coordinates
+    u_mode0 = u / scale_x + offset_x
+    v_mode0 = v / scale_y + offset_y
+
     # 2. Get the parameters we need: focal length, principal point, and rotation vector and translation vector
     fx = camera_matrix[0, 0]
     fy = camera_matrix[1, 1]
@@ -60,8 +56,8 @@ def calculate_world_3D(u, v, Zc = 0.6731): # Zc is the distance from the camera 
     Translation_vector = T_world_camera[0:3, 3].reshape(3, 1)
 
     # 4. Compute the 3D coordinates of the target in the camera frame
-    Xc = (u - cx) * Zc / fx
-    Yc = (v - cy) * Zc / fy
+    Xc = (u_mode0 - cx) * Zc / fx
+    Yc = (v_mode0 - cy) * Zc / fy
     camera_point = np.array([[Xc], [Yc], [Zc]])
 
     # 5. Compute the 3D coordinates of the target in the world frame
